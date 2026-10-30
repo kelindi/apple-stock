@@ -4,3 +4,4 @@ node_modules/
 settings.json
 .vapid.json
 subscriptions.json
+history.json

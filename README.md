@@ -93,6 +93,7 @@ The workflow is scheduled every 5 minutes, but GitHub often starts scheduled run
 | `MAX_DISTANCE_KM` | `50` | Ignore stores farther than this |
 | `INTERVAL_SECONDS` | `30` | Time between checks for `npm start` (minimum 30, with ±15% jitter) |
 | `STATE_FILE` | `.state.json` | Where the last seen availability is stored |
+| `HISTORY_FILE` | `history.json` | Every time something came into stock and how long it lasted, shown under **History** in the UI |
 | `HEADLESS` | `true` | Set to `false` to watch the browser |
 
 ### Notifiers
@@ -101,7 +102,7 @@ Configure any combination of these:
 
 - **Phone/desktop notifications** (built in, free, no account): open the UI and tap **Turn on notifications**. On iPhone (iOS 16.4+), open the page in Safari, tap Share → **Add to Home Screen**, open it from the home screen, then turn notifications on. Alerts are sent with standard Web Push, so they arrive even when the app is closed. Keys are generated into `.vapid.json` on first run (or set `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY`), and devices are saved in `subscriptions.json`.
 - **Email** via [Resend](https://resend.com) (free tier: 3,000 emails/month): `RESEND_API_KEY`, `EMAIL_TO` (comma-separated), and optionally `EMAIL_FROM`. Without a verified domain, Resend only delivers to the email on your Resend account, using the default `onboarding@resend.dev` sender.
-- **Push** via [ntfy](https://ntfy.sh) (free app for iPhone/Android): tap **Get alerts in the ntfy app** in the UI. It picks a random topic; subscribe to that topic in the app (or tap **Subscribe**) and tap **Test**. Anyone who knows the topic can read it, so keep it random. You can also set `NTFY_TOPIC` (plus `NTFY_SERVER` if you self-host).
+- **Push** via [ntfy](https://ntfy.sh) (free app for iPhone/Android): tap **Get alerts in the ntfy app** in the UI. It picks a random topic; subscribe to that topic in the app (or tap **Subscribe**) and tap **Test**. Anyone who knows the topic can read it, so keep it random. You can also set `NTFY_TOPIC` (plus `NTFY_SERVER` if you self-host). Stock alerts are sent as `urgent`; set `NTFY_PRIORITY` (e.g. `high`) to change that. Tapping an alert opens the page for that exact model.
 - **Discord**: `DISCORD_WEBHOOK_URL` from a channel's Integrations → Webhooks.
 
 ## Caveats

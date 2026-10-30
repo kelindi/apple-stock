@@ -73,6 +73,16 @@
   .list span { color: var(--dim); font-size: 14px; text-align: right; }
   .list li.hit span { color: var(--hit); font-weight: 600; }
   .list li.hit span::before { content: "●"; margin-right: 6px; font-size: 10px; vertical-align: 2px; }
+  .history { margin-top: 56px; }
+  .history h2 { font-size: 24px; font-weight: 600; margin: 0 0 4px; letter-spacing: 0.009em; }
+  .history ol { margin: 16px 0 0; padding: 0; list-style: none; }
+  .history li { display: grid; grid-template-columns: 1fr auto; gap: 2px 18px; padding: 14px 0; border-top: 1px solid var(--line); }
+  .history li:last-child { border-bottom: 1px solid var(--line); }
+  .history b { font-weight: 600; font-size: 17px; }
+  .history .where, .history .when { color: var(--dim); font-size: 14px; }
+  .history .when { text-align: right; }
+  .history li.live .when { color: var(--hit); font-weight: 600; }
+  .history .empty { color: var(--dim); font-size: 14px; }
   footer { color: var(--dim); font-size: 12px; text-align: center; margin-top: 28px; min-height: 18px; }
   footer.err { color: #e30000; }
   [hidden] { display: none !important; }
@@ -85,6 +95,8 @@
     .list li { grid-template-columns: 44px 1fr; gap: 4px 14px; }
     .list img, .list .ph { width: 44px; height: 52px; grid-row: span 2; }
     .list span { text-align: left; }
+    .history li { grid-template-columns: 1fr; }
+    .history .when { text-align: left; }
   }
 </style>
 </head>
@@ -123,6 +135,11 @@
     </div>
   </div>
   <ul class="list" id="rows"></ul>
+  <section class="history">
+    <h2>History</h2>
+    <div class="hint">Every time a model showed up for pickup or 2-hour courier, and how long it lasted.</div>
+    <ol id="history"></ol>
+  </section>
   <footer id="status"></footer>
 </main>
 <script>
@@ -175,6 +192,7 @@ function render() {
     renderControls();
   }
   renderRows();
+  renderHistory();
   const { checking, lastChecked, error } = state;
   $('status').className = error ? 'err' : '';
   $('status').textContent = error || (checking ? 'Checking…' : lastChecked ? `Checked ${ago(lastChecked)}` : '');
@@ -275,6 +293,34 @@ function renderRows() {
     img(images.get(m.partNumber)),
     el('b', { textContent: short(m.name, productTitle()) }),
     el('span', { textContent: m.status }))));
+}
+
+const when = (iso) => new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+const lasted = (from, to) => {
+  const m = Math.round((new Date(to) - new Date(from)) / 60000);
+  return m < 1 ? 'under a minute' : m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`;
+};
+
+let historyDrawn = '';
+function renderHistory() {
+  const entries = state.history ?? [];
+  const key = JSON.stringify(entries);
+  if (key === historyDrawn) return;
+  historyDrawn = key;
+  if (!entries.length) {
+    $('history').replaceChildren(el('li', { className: 'empty', textContent: 'Nothing has been in stock yet. Anything it finds will be listed here.' }));
+    return;
+  }
+  $('history').replaceChildren(...entries.map((e) => {
+    const where = e.type === 'pickup' ? `Pickup · ${e.storeName}${e.distance ? ` (${e.distance})` : ''}` : '2-hour courier';
+    const span = e.endedAt
+      ? `${when(e.firstSeen)} · gone after ${lasted(e.firstSeen, e.endedAt)}`
+      : `In stock now · since ${when(e.firstSeen)}`;
+    return el('li', { className: e.endedAt ? '' : 'live' },
+      el('b', { textContent: short(e.name, productTitle()) }),
+      el('span', { className: 'when', textContent: span }),
+      el('span', { className: 'where', textContent: where }));
+  }));
 }
 
 $('product').onclick = (e) => {
