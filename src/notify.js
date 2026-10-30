@@ -40,7 +40,7 @@ async function sendEmail(env, { subject, text, url }) {
 
 async function sendNtfy(env, { subject, text, url }) {
   const server = (env.NTFY_SERVER || 'https://ntfy.sh').replace(/\/$/, '');
-  const headers = { Title: subject, Priority: 'high', Tags: 'iphone' };
+  const headers = { Title: subject, Priority: env.NTFY_PRIORITY || 'urgent', Tags: 'iphone' };
   if (url) headers.Click = url;
   const res = await fetch(`${server}/${encodeURIComponent(env.NTFY_TOPIC)}`, {
     method: 'POST',

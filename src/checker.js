@@ -1,8 +1,9 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { AppleStore, COUNTRIES, normalizeCountry, normalizeProduct, productName } from './apple.js';
-import { availabilityKeys, parseCatalog, parseFulfillment, parseProducts, selectProducts, shortPickupQuote } from './parse.js';
+import { availabilityKeys, parseCatalog, parseFulfillment, parseProducts, productSelectionData, selectProducts, shortPickupQuote } from './parse.js';
 import { configuredNotifiers, notifyAll } from './notify.js';
 import { loadState, saveState } from './state.js';
+import { loadHistory, saveHistory, updateHistory } from './history.js';
 
 const SETTING_KEYS = ['country', 'product', 'model', 'filters', 'postalCode', 'maxDistanceKm', 'emailTo', 'ntfyTopic'];
 
@@ -81,11 +82,13 @@ function chunk(list, size) {
 }
 
 export class Checker {
-  constructor({ env, settingsFile, stateFile, headless, dryRun, log, push }) {
+  constructor({ env, settingsFile, stateFile, historyFile, headless, dryRun, log, push }) {
     this.env = env;
     this.push = push;
     this.settingsFile = settingsFile;
     this.stateFile = stateFile;
+    this.historyFile = historyFile;
+    this.history = [];
     this.headless = headless;
     this.dryRun = dryRun;
     this.log = log;
@@ -112,6 +115,12 @@ export class Checker {
       } catch (err) {
         if (err.code !== 'ENOENT') this.log(`ignoring ${this.settingsFile}: ${err.message}`);
       }
+    }
+    if (this.historyFile) {
+      this.history = await loadHistory(this.historyFile).catch((err) => {
+        this.log(`ignoring ${this.historyFile}: ${err.message}`);
+        return [];
+      });
     }
     this.store = new AppleStore({ country: this.settings.country, product: this.settings.product, headless: this.headless, log: this.log });
     await Promise.all([this.loadProducts(), this.loadVariants()]);
@@ -218,6 +227,7 @@ export class Checker {
       variants: this.variants,
       productImages: this.productImages,
       models: this.models,
+      history: this.history.slice(-100).reverse(),
       checking: Boolean(this.checking),
       lastChecked: this.lastChecked,
       error: this.error,
@@ -283,6 +293,11 @@ export class Checker {
     const current = availabilityKeys(results);
     const previous = await loadState(this.stateFile);
     const fresh = [...current.keys()].filter((k) => !previous.has(k));
+    if (this.historyFile && !this.dryRun) {
+      const checked = new Set(selected.map((p) => p.partNumber));
+      this.history = updateHistory(this.history, current, { checked, names, now: this.lastChecked });
+      await saveHistory(this.historyFile, this.history);
+    }
     const stores = new Set(results.pickup.map((p) => p.storeName));
     const sample = results.pickup[0]?.quote || results.delivery[0]?.courierText || '';
     this.log(
@@ -292,7 +307,8 @@ export class Checker {
 
     let delivered = true;
     if (fresh.length > 0) {
-      const message = buildMessage(fresh.map((k) => current.get(k)), names, store.productUrl);
+      const items = fresh.map((k) => current.get(k));
+      const message = buildMessage(items, names, modelUrl(store.html, store.productUrl, items[0].partNumber));
       this.log(`${message.subject}\n${message.text}`);
       const notifiers = this.notifiers();
       if (!this.dryRun && notifiers.length > 0) delivered = await notifyAll(notifiers, message, this.log);
@@ -326,6 +342,14 @@ export function summarize(selected, { pickup, delivery }) {
     }
     return { partNumber: p.partNumber, name: p.name, status: parts.join(' · '), hit };
   });
+}
+
+// Link straight to the model's page (colour and storage already chosen), preferring the unlocked version.
+export function modelUrl(html, productUrl, partNumber) {
+  const products = (html && productSelectionData(html)?.products) || [];
+  const tokens = products.filter((p) => p.partNumber === partNumber && p.seoUrlToken).map((p) => p.seoUrlToken);
+  const token = tokens.find((t) => t.endsWith('-unlocked')) ?? tokens[0];
+  return token ? `${productUrl}/${token}` : productUrl;
 }
 
 const MAX_LINES = 15;

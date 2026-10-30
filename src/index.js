@@ -29,6 +29,7 @@ async function main() {
     env,
     settingsFile: env.SETTINGS_FILE || 'settings.json',
     stateFile: env.STATE_FILE || '.state.json',
+    historyFile: env.HISTORY_FILE || 'history.json',
     headless: env.HEADLESS !== 'false',
     dryRun: args.has('--dry-run'),
     log,
